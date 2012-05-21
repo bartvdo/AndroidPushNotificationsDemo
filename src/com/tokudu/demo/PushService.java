@@ -35,7 +35,7 @@ public class PushService extends Service
 	public static final String		TAG = "DemoPushService";
 
 	// the IP address, where your MQTT broker is running.
-	private static final String		MQTT_HOST = "209.124.50.174";
+	private static final String		MQTT_HOST = "10.0.2.2";
 	// the port at which the broker is running. 
 	private static int				MQTT_BROKER_PORT_NUM      = 1883;
 	// Let's not use the MQTT persistence.
@@ -53,7 +53,7 @@ public class PushService extends Service
 		
 	// MQTT client ID, which is given the broker. In this example, I also use this for the topic header. 
 	// You can use this to run push notifications for multiple apps with one MQTT broker. 
-	public static String			MQTT_CLIENT_ID = "tokudu";
+	public static String			MQTT_CLIENT_ID = "test";
 
 	// These are the actions for the service (name are descriptive enough)
 	private static final String		ACTION_START = MQTT_CLIENT_ID + ".START";
@@ -270,6 +270,7 @@ public class PushService extends Service
 	// 
 	private synchronized void connect() {		
 		log("Connecting...");
+
 		// fetch the device ID from the preferences.
 		String deviceID = mPrefs.getString(PREF_DEVICE_ID, null);
 		// Create a new connection only if the device id is not NULL
@@ -277,6 +278,7 @@ public class PushService extends Service
 			log("Device ID not found.");
 		} else {
 			try {
+                log("Connecting: " + MQTT_HOST + ":" + deviceID);
 				mConnection = new MQTTConnection(MQTT_HOST, deviceID);
 			} catch (MqttException e) {
 				// Schedule a reconnect, if we failed to connect
