@@ -23,16 +23,19 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.IBinder;
 import android.util.Log;
-
+ 
 /* 
  * PushService that does all of the work.
  * Most of the logic is borrowed from KeepAliveService.
  * http://code.google.com/p/android-random/source/browse/trunk/TestKeepAlive/src/org/devtcg/demo/keepalive/KeepAliveService.java?r=219
  */
-public class PushService extends Service
+public class PushService extends Service 
 {
 	// this is the log tag
 	public static final String		TAG = "DemoPushService";
+	
+	public static final String      GREEN_TOPIC="nanode/green_led";
+	public static final String 		RED_TOPIC="nanode/red_led";
 
 	// the IP address, where your MQTT broker is running.
 	private static final String		MQTT_HOST = "10.0.2.2";
@@ -46,21 +49,23 @@ public class PushService extends Service
 	private static short			MQTT_KEEP_ALIVE           = 60 * 15;
 	// Set quality of services to 0 (at most once delivery), since we don't want push notifications 
 	// arrive more than once. However, this means that some messages might get lost (delivery is not guaranteed)
-	private static int[]			MQTT_QUALITIES_OF_SERVICE = { 0 } ;
+	private static int[]			MQTT_QUALITIES_OF_SERVICE = { 0,0 } ;
 	private static int				MQTT_QUALITY_OF_SERVICE   = 0;
 	// The broker should not retain any messages.
-	private static boolean			MQTT_RETAINED_PUBLISH     = false;
+	private static boolean			MQTT_RETAINED_PUBLISH     = true;
 		
 	// MQTT client ID, which is given the broker. In this example, I also use this for the topic header. 
 	// You can use this to run push notifications for multiple apps with one MQTT broker. 
 	public static String			MQTT_CLIENT_ID = "test";
+	
 
 	// These are the actions for the service (name are descriptive enough)
 	private static final String		ACTION_START = MQTT_CLIENT_ID + ".START";
 	private static final String		ACTION_STOP = MQTT_CLIENT_ID + ".STOP";
 	private static final String		ACTION_KEEPALIVE = MQTT_CLIENT_ID + ".KEEP_ALIVE";
 	private static final String		ACTION_RECONNECT = MQTT_CLIENT_ID + ".RECONNECT";
-	
+	private static final String     ACTION_RED = MQTT_CLIENT_ID + ".RED";
+	private static final String     ACTION_GREEN = MQTT_CLIENT_ID + ".GREEN";
 	// Connection log for the push service. Good for debugging.
 	private ConnectionLog 			mLog;
 	
@@ -97,12 +102,15 @@ public class PushService extends Service
 	// This is the instance of an MQTT connection.
 	private MQTTConnection			mConnection;
 	private long					mStartTime;
-	
 
+	private String mqtthost;
+	
+ 
 	// Static method to start the service
-	public static void actionStart(Context ctx) {
+	public static void actionStart(Context ctx,String host) {
 		Intent i = new Intent(ctx, PushService.class);
 		i.setAction(ACTION_START);
+		i.putExtra("host", host);
 		ctx.startService(i);
 	}
 
@@ -117,6 +125,18 @@ public class PushService extends Service
 	public static void actionPing(Context ctx) {
 		Intent i = new Intent(ctx, PushService.class);
 		i.setAction(ACTION_KEEPALIVE);
+		ctx.startService(i);
+	}
+	public static void actionRed(Context ctx,String m) {
+		Intent i = new Intent(ctx, PushService.class);
+		i.setAction(ACTION_RED);
+		i.putExtra("red", m);
+		ctx.startService(i);
+	}
+	public static void actionGreen(Context ctx, String m) {
+		Intent i = new Intent(ctx, PushService.class);
+		i.setAction(ACTION_GREEN);
+		i.putExtra("green", m);
 		ctx.startService(i);
 	}
 
@@ -183,6 +203,7 @@ public class PushService extends Service
 			stop();
 			stopSelf();
 		} else if (intent.getAction().equals(ACTION_START) == true) {
+			mqtthost=intent.getStringExtra("host");
 			start();
 		} else if (intent.getAction().equals(ACTION_KEEPALIVE) == true) {
 			keepAlive();
@@ -190,6 +211,12 @@ public class PushService extends Service
 			if (isNetworkAvailable()) {
 				reconnectIfNecessary();
 			}
+		}else if (intent.getAction().equals(ACTION_RED) == true) {
+			String m=intent.getStringExtra("red");
+			redmessage(m);
+		}else if (intent.getAction().equals(ACTION_GREEN) == true) {
+			String m=intent.getStringExtra("green");
+			greenmessage(m);
 		}
 	}
 	
@@ -270,7 +297,8 @@ public class PushService extends Service
 	// 
 	private synchronized void connect() {		
 		log("Connecting...");
-
+		
+		if(mqtthost==null)mqtthost=MQTT_HOST;
 		// fetch the device ID from the preferences.
 		String deviceID = mPrefs.getString(PREF_DEVICE_ID, null);
 		// Create a new connection only if the device id is not NULL
@@ -278,8 +306,8 @@ public class PushService extends Service
 			log("Device ID not found.");
 		} else {
 			try {
-                log("Connecting: " + MQTT_HOST + ":" + deviceID);
-				mConnection = new MQTTConnection(MQTT_HOST, deviceID);
+                log("Connecting: " + mqtthost + ":" + deviceID);
+				mConnection = new MQTTConnection(mqtthost, deviceID);
 			} catch (MqttException e) {
 				// Schedule a reconnect, if we failed to connect
 				log("MqttException: " + (e.getMessage() != null ? e.getMessage() : "NULL"));
@@ -479,7 +507,7 @@ public class PushService extends Service
 				//  a connection
 				log("Connection error" + "No connection");	
 			} else {									
-				String[] topics = { topicName };
+				String[] topics = { GREEN_TOPIC,RED_TOPIC };
 				mqttClient.subscribe(topics, MQTT_QUALITIES_OF_SERVICE);
 			}
 		}	
@@ -487,7 +515,7 @@ public class PushService extends Service
 		 * Sends a message to the message broker, requesting that it be published
 		 *  to the specified topic.
 		 */
-		private void publishToTopic(String topicName, String message) throws MqttException {		
+		public void publishToTopic(String topicName, String message) throws MqttException {		
 			if ((mqttClient == null) || (mqttClient.isConnected() == false)) {
 				// quick sanity check - don't try and publish if we don't have
 				//  a connection				
@@ -519,6 +547,7 @@ public class PushService extends Service
 		public void publishArrived(String topicName, byte[] payload, int qos, boolean retained) {
 			// Show a notification
 			String s = new String(payload);
+			sendRecievedMessage(topicName, s);
 			showNotification(s);	
 			log("Got message: " + s);
 		}   
@@ -528,5 +557,32 @@ public class PushService extends Service
 			// publish to a keep-alive topic
 			publishToTopic(MQTT_CLIENT_ID + "/keepalive", mPrefs.getString(PREF_DEVICE_ID, ""));
 		}		
+	}
+	public void sendRecievedMessage(String topic, String payload){
+		log("broadcasting");
+		Intent i=new Intent(PushActivity.NEWMESSAGE);
+		i.putExtra("topic", topic);
+		i.putExtra("message", payload);
+		sendBroadcast(i);
+
+	}
+	
+	public void redmessage(String m) {
+		try {
+			mConnection.publishToTopic(RED_TOPIC, m);
+			log("switched red");
+		} catch (MqttException e) {
+			log("tried sending "+m+" but failed with"+e.getMessage());
+		}
+		
+	}
+
+	public void greenmessage(String m) {
+		try {
+			mConnection.publishToTopic(GREEN_TOPIC, m);
+			log("switched green");
+		} catch (MqttException e) {
+			log("tried sending "+m+" but failed with"+e.getMessage());
+		}
 	}
 }

@@ -6,14 +6,14 @@
     android:background="@color/background_color"
     >
     
-    <ImageView android:id="@+id/logo" 
+ <!--     <ImageView android:id="@+id/logo" 
           android:src="@drawable/logo"
           android:layout_centerHorizontal="true" 
           android:layout_width="wrap_content" 
           android:layout_height="wrap_content"       
           android:layout_gravity="center_horizontal"
           android:layout_marginTop="5dip"    
-     /> 
+     /> -->
      
     <TextView android:id="@+id/targetlabel_text" 
 	     android:text = "@string/target"   
@@ -32,8 +32,26 @@
          android:layout_marginTop="5dip"    
          android:textStyle="bold"
          android:textColor="@color/text_color"
-     />      
-    
+     />  
+     <ToggleButton android:id="@+id/redtogglebutton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:textOn="Red on"
+        android:textOff="Red off"
+        android:onClick="onToggleClicked"/>   
+     <ToggleButton android:id="@+id/greentogglebutton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:textOn="Green on"
+        android:textOff="Green off"
+        android:onClick="onToggleClicked"/>
+    <EditText android:id="@+id/edit_text_out"
+            android:layout_width="wrap_content"
+            android:layout_height="50dip"
+            android:layout_gravity="center_horizontal"
+        />
      <Button android:id="@+id/start_button" 
           android:text="@string/start_service" 
           android:layout_width="wrap_content" 
